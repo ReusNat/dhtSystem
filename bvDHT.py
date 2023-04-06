@@ -80,20 +80,70 @@ def leave(connInfo):
                 sock.send(data[hasPos])
             conform = sock.recv(2).decode()
 
-def update_peer():
-    pass
+def update_peer(connInfo):
+    sock = connInfo[0]
+    sock.send('UPDATE_PEER_'.encode())
+    sock.send(ourID.encode())
+    if sock.recv(2).decode() != 'ok':
+        while sock.recv(2).decode() != 'ok':
+            sock.send(ourID.encode())
 
-def contains():
-    pass
 
-def get_data():
-    pass
+def contains(hashPos, connInfo):
+    sock = connInfo[0]
+    sock.send('CONTAIN_FILE'.encode())
+    sock.send(hashPos.encode())
+    confirm = sock.recv(2).decode()
+    if confirm == 'FU':
+        return False
+    confirm = sock.recv(2).decode()
+    if confirm == 'FU':
+        return False
+    
+    return True
 
-def insert():
-    pass
+def get_data(hashPos, connInfo):
+    sock = connInfo[0]
+    sock.send('GET_DATA_NOW'.encode())
+    sock.send(hashPos)
+    confirm = sock.recv(2)
+    if confirm == 'FU':
+        return None
+    confirm = sock.recv(2)
+    if confirm == 'FU':
+        return None
+    
+    numBytes = getline(connInfo)
+    return sock.recv(int(numBytes.rstrip()))
 
-def delete():
-    pass
+def insert(hashPos, connInfo, fileBytes):
+    sock = connInfo[0]
+    sock.send('INSERT_FILE!'.encode())
+    sock.send(hashPos)
+    confirm = sock.recv(2).decode()
+    if confirm == 'FU':
+        return False
+    
+    sock.send( (str(len(fileBytes)) + '\n').encode())
+    sock.send(fileBytes)
+
+    confirm = sock.recv(2).decode()
+    if confirm == 'FU':
+        return False
+    return True
+
+def delete(hashPos, connInfo):
+    sock = connInfo[0]
+    sock.send('DELETE_FILE!'.encode())
+    sock.send(hashPos.encode())
+    confirm = sock.recv(2).decode()
+    if confirm == 'FU':
+        return False
+    confirm = sock.recv(2).decode()
+    if confirm == 'FU':
+        return False
+    
+    return True
 
 def handle_client(connInfo):
     pass
