@@ -15,29 +15,6 @@ def getLine(conn):
             break
     return msg.decode()
 
-
-if len(argv) < 3:
-    exit('Not enough arguments\nUsage: python3 bvDHT.py <yourIP> <yourPort>')
-elif len(argv) > 3:
-    exit('Too many arguments\nUsage: python3 bvDHT.py <yourIP> <yourPort>')
-
-ourIP = argv[1]
-ourPort = argv[2]
-ourID = f'{ourIP}:{ourPort}'
-
-data = {}
-nextID = ''
-
-#<clientIP>:<clientPort> 
-clientID = input('Client ID: ')
-known_peers = [clientID]
-clientIP, clientPort = clientID.split(':')
-#clientSock = socket(AF_INET, SOCK_STREAM)
-#clientSock.connect( (clientIP, int(clientPort)) )
-
-print(f'{ourID=}')
-print(f'{known_peers[0]=}')
-
 def closest_peer(hashedpos, connInfo):
     sock, sockAddress = connInfo
     sock.send('CLOSEST_PEER'.encode())
@@ -72,7 +49,7 @@ def leave(connInfo):
     conform = sock.recv(2).decode()
     if conform == 'ok':
         return
-    elif conform == 'fu':
+    elif conform == 'FU':
         while conform != 'ok':
             for hashPos in data:
                 sock.send(hashPos)
@@ -145,7 +122,42 @@ def delete(hashPos, connInfo):
     
     return True
 
-def handle_client(connInfo):
-    pass
+def handle_client(connInfo, commandDictionary):
+    sock = connInfo[0]
+    command = sock.recv(12).decode()
+    commandDictionart[command]
 
+if len(argv) < 3:
+    exit('Not enough arguments\nUsage: python3 bvDHT.py <yourIP> <yourPort>')
+elif len(argv) > 3:
+    exit('Too many arguments\nUsage: python3 bvDHT.py <yourIP> <yourPort>')
 
+ourIP = argv[1]
+ourPort = argv[2]
+ourID = f'{ourIP}:{ourPort}'
+
+data = {}
+nextID = ''
+
+#<clientIP>:<clientPort> 
+clientID = input('Client ID: ')
+known_peers = [clientID]
+clientIP, clientPort = clientID.split(':')
+#clientSock = socket(AF_INET, SOCK_STREAM)
+#clientSock.connect( (clientIP, int(clientPort)) )
+
+print(f'{ourID=}')
+print(f'{known_peers[0]=}')
+
+# Listening Socket
+listener = socker(AF_INET, SOCK_STREAM)
+listener.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+listener.bind( ('', ourPort) )
+listener.listen(32)
+
+running = True
+while running:
+    try:
+        threading.Thread(target=handleClient, args=(listener.accept(), commandDict,), daemon=True).start()
+    except KeyboardInterrupt:
+        running = False
