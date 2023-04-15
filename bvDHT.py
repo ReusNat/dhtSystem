@@ -43,7 +43,7 @@ def joinSend(hashedPos, sock):
     sock.send('ok'.encode())
 
 
-def joinRecv(hashedPos, connInfo):
+def joinRecv(connInfo):
     pass
 
 
