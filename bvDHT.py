@@ -14,8 +14,11 @@ def getline(conn):
     return msg.decode()
 
 
-def closestPeerSend(hashedPos, connInfo):
-    sock, sockAddress = connInfo
+def closestPeerSend(hashedPos, connInfo=None):
+    if connInfo:
+        sock, sockAddress = connInfo
+    else:
+        connInfo = ('bork', 'meow')
     sock.send('CLOSEST_PEER'.encode())
     sock.send(hashedPos)
     return getline(sock)
@@ -25,17 +28,15 @@ def closestPeerRecv(connInfo):
     pass
 
 
-def joinSend(hashedPos, connInfo):
-    global nextID
-    sock, sockAddress = connInfo
+def joinSend(hashedPos, sock):
     sock.send('JOIN_DHT_NOW'.encode())
     sock.send(ourID.encode())
-    nextID = getline(connInfo)
-    numFiles = getline(connInfo)
+    fingerTable['next'] = getline(sock)
+    numFiles = getline(sock)
 
     for i in range(0, numFiles):
-        fileHashPos = getline(connInfo)
-        fileSize = int(getline(connInfo).rstrip())
+        fileHashPos = getline(sock)
+        fileSize = int(getline(sock).rstrip())
         fileBytes = sock.recv(fileSize)
         data[fileHashPos] = fileBytes
     updatePeerSend(ourID)
@@ -46,8 +47,7 @@ def joinRecv(hashedPos, connInfo):
     pass
 
 
-def leaveSend(connInfo):
-    sock, sockAddress = connInfo
+def leaveSend(sock):
     sock.send('TIME_2_SPLIT'.encode())
     sock.send((str(len(data) + '\n').encode()))
     for hashPos in data:
@@ -121,8 +121,7 @@ def getDataRecv(connInfo):
     pass
 
 
-def insertSend(hashPos, connInfo, fileBytes):
-    sock = connInfo[0]
+def insertSend(hashPos, sock, fileBytes):
     sock.send('INSERT_FILE!'.encode())
     sock.send(hashPos)
     confirm = sock.recv(2).decode()
@@ -140,7 +139,7 @@ def insertSend(hashPos, connInfo, fileBytes):
 
 def insertRecv(connInfo):
     sock = connInfo[0]
-    hashPos = int(sock.recv(56).decode(), base=10)
+    hashPos = int(sock.recv(56).decode(), base=16)
     if closestPeerSend(connInfo, hashPos) == fingerTable['me']:
         sock.send('OK'.encode())
         fileSize = int(getline(sock))
@@ -155,8 +154,7 @@ def insertRecv(connInfo):
         sock.send('FU'.encode())
 
 
-def deleteSend(hashPos, connInfo):
-    sock = connInfo[0]
+def deleteSend(hashPos, sock):
     sock.send('DELETE_FILE!'.encode())
     sock.send(hashPos.encode())
     confirm = sock.recv(2).decode()
@@ -170,7 +168,17 @@ def deleteSend(hashPos, connInfo):
 
 
 def deleteRecv(connInfo):
-    pass
+    sock = connInfo[0]
+    hashPos = sock.recv(56)
+    if closestPeerSend(connInfo, hashPos) == fingerTable['me']:
+        sock.send('OK'.encode())
+        if hashPos in data:
+            del data[hashPos]
+            sock.send('OK'.encode())
+        else:
+            sock.send('FU'.encode())
+    else:
+        sock.send('FU'.encode())
 
 
 def handleClient(connInfo):
@@ -189,6 +197,50 @@ def handleClient(connInfo):
     commandDictionary[command](connInfo)
 
 
+def run():
+    running = True
+    while running:
+        try:
+            commands = ['insert', 'delete', 'leave', 'get']
+            command = input('What do? ').lower()
+
+            if command not in commands:
+                print('Improper command,\
+                        please use one of the following: ')
+                print(commands)
+            elif command == 'insert':
+                fileName = input('File name: ')
+                fileHashPos = hashlib.sha224(
+                        fileName.encode()).hexdigest()
+                closestIP, closestPort = closestPeerSend(fileHashPos).split(':')
+                closestPort = int(closestPort)
+                peerSock = socket(AF_INET, SOCK_STREAM)
+                peerSock.connect((closestIP, closestPort))
+                try:
+                    fileBytes = open(fileName, 'rb').read()
+                    if insertSend(fileHashPos, peerSock, fileBytes):
+                        print(f'{fileName} inserted.')
+                    else:
+                        print('Insertion failed.')
+                except FileNotFoundError:
+                    print('File doesn\'t exist.')
+            elif command == 'delete':
+                fileName = input('File name: ')
+                fileHashPos = hashlib.sha224(
+                        fileName.encode()).hexdigest()
+                closestIP, closestPort = closestPeerSend(fileHashPos).split(':')
+                closestPort = int(closestPort)
+                peerSock = socket(AF_INET, SOCK_STREAM)
+                peerSock.connect((closestIP, closestPort))
+                deleteSend(fileHashPos, peerSock)
+            elif command == 'get':
+                pass
+            elif command == 'leave':
+                pass
+        except KeyboardInterrupt:
+            running = False
+
+
 if len(argv) < 3:
     exit('Not enough arguments\nUsage: python3 bvDHT.py <yourIP> <yourPort>')
 elif len(argv) > 3:
@@ -200,7 +252,7 @@ ourID = f'{ourIP}:{ourPort}'
 
 data = {}
 fingerTable = {
-    'me': (ourIP, ourPort),
+    'me': (ourIP, int(ourPort)),
     'next': '',
     'prev': '',
     '1': '',
@@ -215,15 +267,12 @@ fingerTable = {
 # <clientIP>:<clientPort>
 clientID = input('Client ID: ')
 if clientID != '':
-    peerPos = hashlib.sha224(clientID.encode()).hexdigest()
-    known_peers = [(clientID, int(peerPos, base=16))]
-    clientIP, clientPort = clientID.split(':')
-    # clientSock = socket(AF_INET, SOCK_STREAM)
-    # clientSock.connect( (clientIP, int(clientPort)) )
-    print(f'{ourID=}')
-    print(f'{known_peers[0]=}')
-else:
-    known_peers = []
+    hashedPos = hashlib.sha224(f'{ourIP}:{ourPort}'.encode()).hexdigest()
+    closestIP, closestPort = closestPeerSend(fileHashPos).split(':')
+    closestPort = int(closestPort)
+    peerSock = socket(AF_INET, SOCK_STREAM)
+    peerSock.connect((closestIP, closestPort))
+    joinSend(hashedPos, peerSock)
 
 # Listening Socket
 listener = socket(AF_INET, SOCK_STREAM)
@@ -231,10 +280,13 @@ listener.setsocket(SOL_SOCKET, SO_REUSEADDR, 1)
 listener.bind(('', ourPort))
 listener.listen(32)
 
+threading.Thread(target=run,
+                 args=(),
+                 daemon=True).start()
 running = True
 while running:
     try:
-        threading.Thread(target=handle_client,
+        threading.Thread(target=handleClient,
                          args=(listener.accept(),),
                          daemon=True).start()
     except KeyboardInterrupt:
