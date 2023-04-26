@@ -13,6 +13,41 @@ def getline(conn):
             break
     return msg.decode()
 
+def updateFingerTable():
+    pass
+
+#inputs the non-encrypted Key.
+#returns closest peer's userID without a new line... str(ip) + ":" + str(port)
+def closestAlgorithim(key):
+    hashedKey = hashlib.sha224(key.encode()).hexdigest()
+    listy = fingerTable.items()
+    end = listy[0]
+    for peer in listy:
+        if peer[1] < hashedKey and peer[1] > end[1]:
+            end = peer
+    if end == listy[1]:
+        if listy[0][1] > hashedKey:
+            end = listy[-1]
+    connTuple = (end[2], int(end[3]))
+    val = str(end[2]) + ":" + str(end[3])
+    while True:
+        clientSock = socket(AF_INET, SOCK_STREAM)
+        clientSock.connect(connTuple)
+        val = closestPeer(clientSocket)
+        splitVal = val.split(":")
+        if (splitVal[0],splitVal[1]) == connTuple:
+            break
+        connTuple = (splitVal[0],splitVal[1])
+    return val
+
+#so this works basically by looking through all of our knownPeers list, which should include us.
+# for each peer in our known peers
+#  check if that peer's ID is less than the hashedKey and greater than the last closest id.
+#  if thats the case, change the last closest id to the current
+#  otherwise continue
+# now if at the end the closest peer is the first, we check if it's actually larger than the ID. If it is, than we know the previous person is actually the holder of that ID
+# thus, we loop back around to the last peer in our list and return that peer's USERID
+
 
 def closestPeerSend(hashedPos, connInfo=None):
     if connInfo:
@@ -25,7 +60,16 @@ def closestPeerSend(hashedPos, connInfo=None):
 
 
 def closestPeerRecv(connInfo):
-    pass
+    hashedKey = getline(sock)
+    listy = fingerTable.items()
+    end = listy[0]
+    for peer in listy:
+        if peer[1] < hashedKey and peer[1] > end[1]:
+            end = peer
+    if end == listy[0]:
+        if listy[0][1] > hashedKey:
+            end = listy[-1]
+    sockRecv.send(str(end[2]) + ":" + (str(end[3]))  + "\n")
 
 
 def joinSend(hashedPos, sock):
@@ -43,8 +87,26 @@ def joinSend(hashedPos, sock):
     sock.send('ok'.encode())
 
 
-def joinRecv(connInfo):
-    pass
+def joinRecv(hashedPos, connInfo):
+    sock = connInfo[0]
+    clientUID = getline(sock)
+    hashedPos = hashlib.sha224(clientUID.encode()).hexdigest()
+    sock.send(fingerTable['next'].encode())
+    clientIp, clientPort = clientUID.split(':')
+
+    filesToSend = {}
+    for file in data:
+        if int(file, base=16) > int(hashedPos, base=16):
+            filesToSend[file] = data[file]
+
+    sock.send(str(len(filesToSend)).encode())
+    for file in filesToSend:
+        sock.send(str(len(filesToSend[file])).encode())
+        sock.send(filesToSend[file])
+
+    comfirm = sock.recv(2).decode()
+    if comfirm == 'OK':
+        fingerTable['next'] = (hashedPos, clientIp, int(clientPort))
 
 
 def leaveSend(sock):
@@ -249,26 +311,25 @@ elif len(argv) > 3:
 ourIP = argv[1]
 ourPort = argv[2]
 ourID = f'{ourIP}:{ourPort}'
-
+hashedKey = hashlib.sha224(ourID.encode()).hexdigest()
 data = {}
 fingerTable = {
-    'me': (ourIP, int(ourPort)),
-    'next': '',
-    'prev': '',
-    '1': '',
-    '2': '',
-    '3': '',
-    '4': '',
-    '5': '',
+    'me': (hashedKey, ourIP, int(ourPort)),
+    'next': (None,None,None), 
+    'prev': (None,None,None),
+    '1': (None,None,None),
+    '2': (None,None,None),
+    '3': (None,None,None),
+    '4': (None,None,None),
+    '5': (None,None,None),
 }
-
 # hashedKey = hashlib.sha224(key.encode()).hexdigest()
 # int(hasedKey, base=16) <- gets the int version of the digest
 # <clientIP>:<clientPort>
 clientID = input('Client ID: ')
 if clientID != '':
     hashedPos = hashlib.sha224(f'{ourIP}:{ourPort}'.encode()).hexdigest()
-    closestIP, closestPort = closestPeerSend(fileHashPos).split(':')
+    closestIP, closestPort = closestPeerSend(hashedPos).split(':')
     closestPort = int(closestPort)
     peerSock = socket(AF_INET, SOCK_STREAM)
     peerSock.connect((closestIP, closestPort))
@@ -276,8 +337,8 @@ if clientID != '':
 
 # Listening Socket
 listener = socket(AF_INET, SOCK_STREAM)
-listener.setsocket(SOL_SOCKET, SO_REUSEADDR, 1)
-listener.bind(('', ourPort))
+listener.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+listener.bind(('', int(ourPort)))
 listener.listen(32)
 
 threading.Thread(target=run,
