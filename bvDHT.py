@@ -34,9 +34,9 @@ def closestAlgorithim(key):
     while True:
         clientSock = socket(AF_INET, SOCK_STREAM)
         clientSock.connect(connTuple)
-        val = closestPeer(clientSocket)
+        val = closestPeerSend(hashedKey, clientSock)
         splitVal = val.split(":")
-        if (splitVal[0],splitVal[1]) == connTuple:
+        if (splitVal[0], splitVal[1]) == connTuple:
             break
         connTuple = (splitVal[0],splitVal[1])
     return val
@@ -54,8 +54,9 @@ def closestPeerSend(hashedPos, connInfo=None):
     if connInfo:
         sock, sockAddress = connInfo
     else:
-        connInfo = ('bork', 'meow')
-        return None
+        sock = socket(AF_INET, SOCK_STREAM)
+        cIP, cPort = clientID.split(':')
+        sock.connect((cIP, int(cPort)))
     sock.send('CLOSEST_PEER'.encode())
     sock.send(hashedPos)
     return getline(sock)
@@ -82,7 +83,7 @@ def joinSend(hashedPos, sock):
     nextPos = hashlib.sha224(f'{nextIP}:{nextPort}'.encode()).hexdigest()
     fingerTable['next'] = (nextPos, nextIP, int(nextPort))
     numFiles = getline(sock)
-    
+
     for i in range(0, numFiles):
         fileHashPos = getline(sock)
         fileSize = int(getline(sock).rstrip())
@@ -320,7 +321,7 @@ hashedKey = hashlib.sha224(ourID.encode()).hexdigest()
 data = {}
 fingerTable = {
     'me': (hashedKey, ourIP, int(ourPort)),
-    'next': (None,None,None), 
+    'next': (None,None,None),
     'prev': (None,None,None),
     '1': (None,None,None),
     '2': (None,None,None),
@@ -334,8 +335,11 @@ fingerTable = {
 clientID = input('Client ID: ')
 if clientID != '':
     hashedPos = hashlib.sha224(f'{ourIP}:{ourPort}'.encode()).hexdigest()
-    closestIP, closestPort = closestPeerSend(hashedPos).split(':')
+    closestIP, closestPort = closestAlgorithim(hashedPos).split(':')
     closestPort = int(closestPort)
+    closestHash = hashlib.sha224(
+            f'{closestIP}:{closestPort}'.encode()).hexdigest()
+    fingerTable['prev'] = (closestHash, closestIP, closestPort)
     peerSock = socket(AF_INET, SOCK_STREAM)
     peerSock.connect((closestIP, closestPort))
     joinSend(hashedPos, peerSock)
