@@ -16,6 +16,7 @@ def getline(conn):
 def updateFingerTable():
     pass
 
+
 #inputs the non-encrypted Key.
 #returns closest peer's userID without a new line... str(ip) + ":" + str(port)
 def closestAlgorithim(key):
@@ -54,12 +55,14 @@ def closestPeerSend(hashedPos, connInfo=None):
         sock, sockAddress = connInfo
     else:
         connInfo = ('bork', 'meow')
+        return None
     sock.send('CLOSEST_PEER'.encode())
     sock.send(hashedPos)
     return getline(sock)
 
 
 def closestPeerRecv(connInfo):
+    sock = connInfo[0]
     hashedKey = getline(sock)
     listy = fingerTable.items()
     end = listy[0]
@@ -75,9 +78,11 @@ def closestPeerRecv(connInfo):
 def joinSend(hashedPos, sock):
     sock.send('JOIN_DHT_NOW'.encode())
     sock.send(ourID.encode())
-    fingerTable['next'] = getline(sock)
+    nextIP, nextPort = getline(sock).split(':')
+    nextPos = hashlib.sha224(f'{nextIP}:{nextPort}'.encode()).hexdigest()
+    fingerTable['next'] = (nextPos, nextIP, int(nextPort))
     numFiles = getline(sock)
-
+    
     for i in range(0, numFiles):
         fileHashPos = getline(sock)
         fileSize = int(getline(sock).rstrip())
@@ -91,7 +96,7 @@ def joinRecv(hashedPos, connInfo):
     sock = connInfo[0]
     clientUID = getline(sock)
     hashedPos = hashlib.sha224(clientUID.encode()).hexdigest()
-    sock.send(fingerTable['next'].encode())
+    sock.send((closestAlgorithim(clientUID) + '\n'))
     clientIp, clientPort = clientUID.split(':')
 
     filesToSend = {}
