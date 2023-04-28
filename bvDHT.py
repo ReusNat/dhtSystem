@@ -323,14 +323,15 @@ ourID = f'{ourIP}:{ourPort}'
 hashedKey = hashlib.sha224(ourID.encode()).hexdigest()
 data = {}
 fingerTable = {
-    'me': (hashedKey, ourIP, int(ourPort)),
-    'next': (hashedKey, ourIP, int(ourPort)),
-    'prev': (hashedKey, ourIP, int(ourPort)),
-    '1': (hashedKey, ourIP, int(ourPort)),
-    '2': (hashedKey, ourIP, int(ourPort)),
-    '3': (hashedKey, ourIP, int(ourPort)),
-    '4': (hashedKey, ourIP, int(ourPort)),
-    '5': (hashedKey, ourIP, int(ourPort)),
+    'me': ("-1", ourIP, int(ourPort)),
+    'intro': (hashedKey, ourIP, int(ourPort)),
+    'next': ("-1", ourIP, int(ourPort)),
+    'prev': ("-1", ourIP, int(ourPort)),
+    '1': ("-1", ourIP, int(ourPort)),
+    '2': ("-1", ourIP, int(ourPort)),
+    '3': ("-1", ourIP, int(ourPort)),
+    '4': ("-1", ourIP, int(ourPort)),
+    '5': ("-1", ourIP, int(ourPort)),
 }
 # hashedKey = hashlib.sha224(key.encode()).hexdigest()
 # int(hasedKey, base=16) <- gets the int version of the digest
@@ -338,6 +339,9 @@ fingerTable = {
 clientID = input('Client ID: ')
 if clientID != '':
     hashedPos = hashlib.sha224(f'{ourIP}:{ourPort}'.encode()).hexdigest()
+    clientIP, clientPort = clientID.split(':')
+    clientHash = hashlib.sha224(f'{clientIP}:{clientPort}'.encode()).hexdigest()
+    fingerTable['intro'] = (clientHash, clientIP, clientPort)
     closestIP, closestPort = closestAlgorithim(hashedPos).split(':')
     closestPort = int(closestPort)
     closestHash = hashlib.sha224(
