@@ -79,6 +79,25 @@ def contains(hashPos, connInfo):
     
     return True
 
+def containsRecv(connInfo):
+    sock = connInfo[0]
+    hashval = sock.recv(56).decode()
+    ourPos = fingerTable['me'][0]
+    nextPos = fingerTable['next'][0]
+    ourPos = int(ourPos, base=16)
+    nextPos = int(nextPos, base=16)
+    hashint = int(hashval, base=16)
+    if ourPos < nextPos:
+        if ourPos <= hashint <= nextPos:
+            sock.send("OK".encode())
+            if hashval in data:
+                sock.send("OK".encode())
+    else:
+        if hashint < nextPos and hashint > ourPos:
+            sock.send("OK".encode())
+            if hashval in data:
+                sock.send("OK".encode())
+
 def get_data(hashPos, connInfo):
     sock = connInfo[0]
     sock.send('GET_DATA_NOW'.encode())
@@ -92,6 +111,29 @@ def get_data(hashPos, connInfo):
     
     numBytes = getline(connInfo)
     return sock.recv(int(numBytes.rstrip()))
+
+def getDataRecv(connInfo):
+    sock.connInfo[0]
+    hashval = sock.recv(56).decode()
+    ourPos = fingerTable['me'][0]
+    nextPos = fingerTable['next'][0]
+    ourPos = int(ourPos, base=16)
+    nextPos = int(nextPos, base=16)
+    hashint = int(hashval, base=16)
+    if ourPos < nextPos:
+        if ourPos <= hashint <= nextPos:
+            sock.send("OK".encode())
+            if hashval in data:
+                sock.send("OK".encode())
+                sock.send((str(len(data[hashval]))+'\n').encode())
+                sock.send(data[hashval])
+    else:
+        if hashint < nextPos and hashint > ourPos:
+            sock.send("OK".encode())
+            if hashval in data:
+                sock.send("OK".encode())
+                sock.send((str(len(data[hashval]))+'\n').encode())
+                sock.send(data[hashval])
 
 def insert(hashPos, connInfo, fileBytes):
     sock = connInfo[0]
