@@ -67,20 +67,20 @@ def closestPeerSend(hashedPos, sock):
 
 def closestPeerRecv(connInfo):
     print('closestPeerRecv')
-    sock = connInfo[0]
-    hashedKeyStr = sock.recv(56).decode()
+    sockRecv = connInfo[0]
+    hashedKeyStr = sockRecv.recv(56).decode()
     hashedKey = int(hashedKeyStr,base = 16)
     listy = list(fingerTable.items())
     end = listy[0]
     for peer in listy:
-        if peer[0][1] == "-1":
+        if peer[1][0] == "-1":
             continue
         if (int(peer[1][0],base = 16) < hashedKey and int(peer[1][0],base=16) > int(end[1][0],base = 16)) or end[1][0] == "-1":
             end = peer
     if end == listy[0]:
         if int(listy[0][1][0],base = 16) > hashedKey:
             end = listy[-1]
-    sockRecv.send((str(end[1][1]) + ":" + (str(end[1][2]))  + "\n").encode)
+    sockRecv.send((str(end[1][1]) + ":" + (str(end[1][2]))  + "\n").encode())
 
 
 def joinSend(hashedPos, sock):
