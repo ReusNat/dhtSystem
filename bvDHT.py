@@ -44,9 +44,9 @@ def closestAlgorithim(key):
         val = closestPeerSend(hashedKeyStr, clientSock)
         print(val)
         splitVal = val.split(":")
-        if (splitVal[0], splitVal[1]) == connTuple:
+        if (splitVal[0], int(splitVal[1])) == connTuple:
             break
-        connTuple = (splitVal[0], splitVal[1])
+        connTuple = (splitVal[0], int(splitVal[1]))
     return val
 
 # so this works basically by looking through all of our knownPeers list, which should include us.
@@ -68,7 +68,7 @@ def closestPeerSend(hashedPos, sock):
 def closestPeerRecv(connInfo):
     print('closestPeerRecv')
     sock = connInfo[0]
-    hashedKeyStr = getline(sock)
+    hashedKeyStr = sock.recv(56).decode()
     hashedKey = int(hashedKeyStr,base = 16)
     listy = list(fingerTable.items())
     end = listy[0]
@@ -80,7 +80,7 @@ def closestPeerRecv(connInfo):
     if end == listy[0]:
         if int(listy[0][1][0],base = 16) > hashedKey:
             end = listy[-1]
-    sockRecv.send(str(end[1][1]) + ":" + (str(end[1][2]))  + "\n")
+    sockRecv.send((str(end[1][1]) + ":" + (str(end[1][2]))  + "\n").encode)
 
 
 def joinSend(hashedPos, sock):
