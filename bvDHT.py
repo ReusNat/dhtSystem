@@ -13,6 +13,7 @@ def getline(conn):
             break
     return msg.decode()
 
+
 def updateFingerTable():
     pass
 
@@ -20,28 +21,29 @@ def updateFingerTable():
 #inputs the non-encrypted Key.
 #returns closest peer's userID without a new line... str(ip) + ":" + str(port)
 def closestAlgorithim(key):
-    hashedKey = hashlib.sha224(key.encode()).hexdigest()
-    listy = fingerTable.items()
+    hashedKey = int(hashlib.sha224(key.encode()).hexdigest(),base = 16)
+    hashedKeyStr = hashlib.sha224(key.encode()).hexdigest()
+    listy = list(fingerTable.items())
     end = listy[0]
     for peer in listy:
-        if peer[1] < hashedKey and peer[1] > end[1]:
+        if int(peer[1][0],base=16) < hashedKey and int(peer[1][0],base = 16) > int(end[1][0],base = 16):
             end = peer
     if end == listy[1]:
-        if listy[0][1] > hashedKey:
+        if int(listy[0][1][0],base = 16) > hashedKey:
             end = listy[-1]
-    connTuple = (end[2], int(end[3]))
-    val = str(end[2]) + ":" + str(end[3])
+    connTuple = (end[1][1], int(end[1][2]))
+    val = str(end[1][1]) + ":" + str(end[1][2])
     while True:
         clientSock = socket(AF_INET, SOCK_STREAM)
         clientSock.connect(connTuple)
-        val = closestPeerSend(hashedKey, clientSock)
+        val = closestPeerSend(hashedKeyStr, clientSock)
         splitVal = val.split(":")
         if (splitVal[0], splitVal[1]) == connTuple:
             break
-        connTuple = (splitVal[0],splitVal[1])
+        connTuple = (splitVal[0], splitVal[1])
     return val
 
-#so this works basically by looking through all of our knownPeers list, which should include us.
+# so this works basically by looking through all of our knownPeers list, which should include us.
 # for each peer in our known peers
 #  check if that peer's ID is less than the hashedKey and greater than the last closest id.
 #  if thats the case, change the last closest id to the current
@@ -64,16 +66,17 @@ def closestPeerSend(hashedPos, connInfo=None):
 
 def closestPeerRecv(connInfo):
     sock = connInfo[0]
-    hashedKey = getline(sock)
-    listy = fingerTable.items()
+    hashedKeyStr = getline(sock)
+    hashedKey = int(hashedKeyStr,base = 16)
+    listy = list(fingerTable.items())
     end = listy[0]
     for peer in listy:
-        if peer[1] < hashedKey and peer[1] > end[1]:
+        if int(peer[1][0],base = 16) < hashedKey and int(peer[1][0],base=16) > int(end[1][0],base = 16):
             end = peer
     if end == listy[0]:
-        if listy[0][1] > hashedKey:
+        if int(listy[0][1][0],base = 16) > hashedKey:
             end = listy[-1]
-    sockRecv.send(str(end[2]) + ":" + (str(end[3]))  + "\n")
+    sockRecv.send(str(end[1][1]) + ":" + (str(end[1][2]))  + "\n")
 
 
 def joinSend(hashedPos, sock):
@@ -321,13 +324,13 @@ hashedKey = hashlib.sha224(ourID.encode()).hexdigest()
 data = {}
 fingerTable = {
     'me': (hashedKey, ourIP, int(ourPort)),
-    'next': (None,None,None),
-    'prev': (None,None,None),
-    '1': (None,None,None),
-    '2': (None,None,None),
-    '3': (None,None,None),
-    '4': (None,None,None),
-    '5': (None,None,None),
+    'next': (hashedKey, ourIP, int(ourPort)),
+    'prev': (hashedKey, ourIP, int(ourPort)),
+    '1': (hashedKey, ourIP, int(ourPort)),
+    '2': (hashedKey, ourIP, int(ourPort)),
+    '3': (hashedKey, ourIP, int(ourPort)),
+    '4': (hashedKey, ourIP, int(ourPort)),
+    '5': (hashedKey, ourIP, int(ourPort)),
 }
 # hashedKey = hashlib.sha224(key.encode()).hexdigest()
 # int(hasedKey, base=16) <- gets the int version of the digest
