@@ -21,22 +21,28 @@ def updateFingerTable():
 #inputs the non-encrypted Key.
 #returns closest peer's userID without a new line... str(ip) + ":" + str(port)
 def closestAlgorithim(key):
+    print('closestAlgor')
     hashedKey = int(hashlib.sha224(key.encode()).hexdigest(),base = 16)
     hashedKeyStr = hashlib.sha224(key.encode()).hexdigest()
     listy = list(fingerTable.items())
     end = listy[0]
     for peer in listy:
-        if int(peer[1][0],base=16) < hashedKey and int(peer[1][0],base = 16) > int(end[1][0],base = 16):
+        if peer[1][0] == "-1":
+            continue
+        if (int(peer[1][0],base=16) < hashedKey and int(peer[1][0],base = 16) > int(end[1][0],base = 16)) or end[1][0] == "-1":
             end = peer
     if end == listy[1]:
         if int(listy[0][1][0],base = 16) > hashedKey:
             end = listy[-1]
     connTuple = (end[1][1], int(end[1][2]))
     val = str(end[1][1]) + ":" + str(end[1][2])
+    print(val)
     while True:
         clientSock = socket(AF_INET, SOCK_STREAM)
         clientSock.connect(connTuple)
+        print("1")
         val = closestPeerSend(hashedKeyStr, clientSock)
+        print(val)
         splitVal = val.split(":")
         if (splitVal[0], splitVal[1]) == connTuple:
             break
@@ -52,26 +58,24 @@ def closestAlgorithim(key):
 # thus, we loop back around to the last peer in our list and return that peer's USERID
 
 
-def closestPeerSend(hashedPos, connInfo=None):
-    if connInfo:
-        sock, sockAddress = connInfo
-    else:
-        sock = socket(AF_INET, SOCK_STREAM)
-        cIP, cPort = clientID.split(':')
-        sock.connect((cIP, int(cPort)))
+def closestPeerSend(hashedPos, sock):
+    print('closestPeerSend')
     sock.send('CLOSEST_PEER'.encode())
-    sock.send(hashedPos)
+    sock.send(hashedPos.encode())
     return getline(sock)
 
 
 def closestPeerRecv(connInfo):
+    print('closestPeerRecv')
     sock = connInfo[0]
     hashedKeyStr = getline(sock)
     hashedKey = int(hashedKeyStr,base = 16)
     listy = list(fingerTable.items())
     end = listy[0]
     for peer in listy:
-        if int(peer[1][0],base = 16) < hashedKey and int(peer[1][0],base=16) > int(end[1][0],base = 16):
+        if peer[0][1] == "-1":
+            continue
+        if (int(peer[1][0],base = 16) < hashedKey and int(peer[1][0],base=16) > int(end[1][0],base = 16)) or end[1][0] == "-1":
             end = peer
     if end == listy[0]:
         if int(listy[0][1][0],base = 16) > hashedKey:
@@ -343,6 +347,7 @@ if clientID != '':
     clientHash = hashlib.sha224(f'{clientIP}:{clientPort}'.encode()).hexdigest()
     fingerTable['intro'] = (clientHash, clientIP, clientPort)
     closestIP, closestPort = closestAlgorithim(hashedPos).split(':')
+    print(closestIP,closestPort)
     closestPort = int(closestPort)
     closestHash = hashlib.sha224(
             f'{closestIP}:{closestPort}'.encode()).hexdigest()
