@@ -14,6 +14,12 @@ def getline(conn):
     return msg.decode()
 
 
+def getLocalIPAddress():
+    s = socket(AF_INET, SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    return s.getsockname()[0]
+
+
 def updateFingerTable():
     pass
 
@@ -100,11 +106,11 @@ def joinSend(hashedPos, sock):
     sock.send('ok'.encode())
 
 
-def joinRecv(hashedPos, connInfo):
+def joinRecv(connInfo):
     sock = connInfo[0]
     clientUID = getline(sock)
     hashedPos = hashlib.sha224(clientUID.encode()).hexdigest()
-    sock.send((closestAlgorithim(clientUID) + '\n'))
+    sock.send((closestAlgorithim(clientUID) + '\n').encode())
     clientIp, clientPort = clientUID.split(':')
 
     filesToSend = {}
@@ -316,35 +322,37 @@ def run():
             running = False
 
 
-if len(argv) < 3:
-    exit('Not enough arguments\nUsage: python3 bvDHT.py <yourIP> <yourPort>')
-elif len(argv) > 3:
-    exit('Too many arguments\nUsage: python3 bvDHT.py <yourIP> <yourPort>')
+if len(argv) < 2:
+    exit('Not enough arguments\nUsage: python3 bvDHT.py <IP>:<Port>')
+elif len(argv) > 2:
+    exit('Too many arguments\nUsage: python3 bvDHT.py <IP>:<Port>')
 
-ourIP = argv[1]
-ourPort = argv[2]
+
+ourIP = getLocalIPAddress()
+ourPort = 5555 
 ourID = f'{ourIP}:{ourPort}'
 hashedKey = hashlib.sha224(ourID.encode()).hexdigest()
 data = {}
 fingerTable = {
-    'me': ("-1", ourIP, int(ourPort)),
-    'intro': (hashedKey, ourIP, int(ourPort)),
-    'next': ("-1", ourIP, int(ourPort)),
-    'prev': ("-1", ourIP, int(ourPort)),
-    '1': ("-1", ourIP, int(ourPort)),
-    '2': ("-1", ourIP, int(ourPort)),
-    '3': ("-1", ourIP, int(ourPort)),
-    '4': ("-1", ourIP, int(ourPort)),
-    '5': ("-1", ourIP, int(ourPort)),
+    'me': ("-1", ourIP, ourPort),
+    'intro': (hashedKey, ourIP, ourPort),
+    'next': ("-1", ourIP, ourPort),
+    'prev': ("-1", ourIP, ourPort),
+    '1': ("-1", ourIP, ourPort),
+    '2': ("-1", ourIP, ourPort),
+    '3': ("-1", ourIP, ourPort),
+    '4': ("-1", ourIP, ourPort),
+    '5': ("-1", ourIP, ourPort),
 }
 # hashedKey = hashlib.sha224(key.encode()).hexdigest()
 # int(hasedKey, base=16) <- gets the int version of the digest
 # <clientIP>:<clientPort>
-clientID = input('Client ID: ')
+
+clientID = argv[1]
+
 if clientID != '':
-    hashedPos = hashlib.sha224(f'{ourIP}:{ourPort}'.encode()).hexdigest()
     clientIP, clientPort = clientID.split(':')
-    clientHash = hashlib.sha224(f'{clientIP}:{clientPort}'.encode()).hexdigest()
+    clientHash = hashlib.sha224(clientID.encode()).hexdigest()
     fingerTable['intro'] = (clientHash, clientIP, clientPort)
     closestIP, closestPort = closestAlgorithim(hashedPos).split(':')
     print(closestIP,closestPort)
