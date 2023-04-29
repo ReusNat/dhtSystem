@@ -27,7 +27,6 @@ def updateFingerTable():
 #inputs the non-encrypted Key.
 #returns closest peer's userID without a new line... str(ip) + ":" + str(port)
 def closestAlgorithim(key):
-    print('closestAlgor')
     hashedKey = int(hashlib.sha224(key.encode()).hexdigest(),base = 16)
     hashedKeyStr = hashlib.sha224(key.encode()).hexdigest()
     listy = list(fingerTable.items())
@@ -35,20 +34,19 @@ def closestAlgorithim(key):
     for peer in listy:
         if peer[1][0] == "-1":
             continue
-        if (int(peer[1][0],base=16) < hashedKey and int(peer[1][0],base = 16) > int(end[1][0],base = 16)) or end[1][0] == "-1":
+        if (int(peer[1][0],base=16) < hashedKey\
+                and int(peer[1][0],base = 16) > int(end[1][0],base = 16))\
+                or end[1][0] == "-1":
             end = peer
     if end == listy[1]:
         if int(listy[0][1][0],base = 16) > hashedKey:
             end = listy[-1]
     connTuple = (end[1][1], int(end[1][2]))
     val = str(end[1][1]) + ":" + str(end[1][2])
-    print(val)
     while True:
         clientSock = socket(AF_INET, SOCK_STREAM)
         clientSock.connect(connTuple)
-        print("1")
         val = closestPeerSend(hashedKeyStr, clientSock)
-        print(val)
         splitVal = val.split(":")
         if (splitVal[0], int(splitVal[1])) == connTuple:
             break
@@ -65,14 +63,12 @@ def closestAlgorithim(key):
 
 
 def closestPeerSend(hashedPos, sock):
-    print('closestPeerSend')
     sock.send('CLOSEST_PEER'.encode())
     sock.send(hashedPos.encode())
     return getline(sock)
 
 
 def closestPeerRecv(connInfo):
-    print('closestPeerRecv')
     sockRecv = connInfo[0]
     hashedKeyStr = sockRecv.recv(56).decode()
     hashedKey = int(hashedKeyStr,base = 16)
@@ -81,7 +77,9 @@ def closestPeerRecv(connInfo):
     for peer in listy:
         if peer[1][0] == "-1":
             continue
-        if (int(peer[1][0],base = 16) < hashedKey and int(peer[1][0],base=16) > int(end[1][0],base = 16)) or end[1][0] == "-1":
+        if (int(peer[1][0],base = 16) < hashedKey\
+                and int(peer[1][0],base=16) > int(end[1][0],base = 16))\
+                or end[1][0] == "-1":
             end = peer
     if end == listy[0]:
         if int(listy[0][1][0],base = 16) > hashedKey:
@@ -91,19 +89,20 @@ def closestPeerRecv(connInfo):
 
 def joinSend(hashedPos, sock):
     sock.send('JOIN_DHT_NOW'.encode())
-    sock.send(ourID.encode())
+    sock.send((ourID + '\n').encode())
     nextIP, nextPort = getline(sock).split(':')
     nextPos = hashlib.sha224(f'{nextIP}:{nextPort}'.encode()).hexdigest()
     fingerTable['next'] = (nextPos, nextIP, int(nextPort))
-    numFiles = getline(sock)
+    numFiles = int(getline(sock).rstrip('\n'))
 
-    for i in range(0, numFiles):
+    for i in range(0, int(numFiles)):
         fileHashPos = getline(sock)
         fileSize = int(getline(sock).rstrip())
         fileBytes = sock.recv(fileSize)
         data[fileHashPos] = fileBytes
-    updatePeerSend(ourID)
-    sock.send('ok'.encode())
+
+    updatePeerSend((nextIP, int(nextPort)))
+    sock.send('OK'.encode())
 
 
 def joinRecv(connInfo):
@@ -118,9 +117,9 @@ def joinRecv(connInfo):
         if int(file, base=16) > int(hashedPos, base=16):
             filesToSend[file] = data[file]
 
-    sock.send(str(len(filesToSend)).encode())
+    sock.send((str(len(filesToSend)) + '\n').encode())
     for file in filesToSend:
-        sock.send(str(len(filesToSend[file])).encode())
+        sock.send((str(len(filesToSend[file])) + '\n').encode())
         sock.send(filesToSend[file])
 
     comfirm = sock.recv(2).decode()
@@ -137,10 +136,10 @@ def leaveSend(sock):
         sock.send(data[hashPos])
 
     conform = sock.recv(2).decode()
-    if conform == 'ok':
+    if conform == 'OK':
         return
     elif conform == 'FU':
-        while conform != 'ok':
+        while conform != 'OK':
             for hashPos in data:
                 sock.send(hashPos)
                 sock.send(len(data[hashPos]))
@@ -152,13 +151,14 @@ def leaveRecv(connInfo):
     pass
 
 
-def updatePeerSend(connInfo):
-    sock = connInfo[0]
+def updatePeerSend(peerInfo):
+    sock = socket(AF_INET, SOCK_STREAM)
+    sock.connect((peerInfo[0], peerInfo[1]))
     sock.send('UPDATE_PEER_'.encode())
-    sock.send(ourID.encode())
-    if sock.recv(2).decode() != 'ok':
-        while sock.recv(2).decode() != 'ok':
-            sock.send(ourID.encode())
+    sock.send((ourID + '\n').encode())
+    if sock.recv(2).decode() != 'OK':
+        while sock.recv(2).decode() != 'OK':
+            sock.send((ourID + '\n').encode())
 
 
 def updatePeerRecv(connInfo):
@@ -339,11 +339,11 @@ elif len(argv) == 2:
 ourIP = getLocalIPAddress()
 ourPort = 5555 
 ourID = f'{ourIP}:{ourPort}'
-hashedKey = hashlib.sha224(ourID.encode()).hexdigest()
+hashedPos = hashlib.sha224(ourID.encode()).hexdigest()
 data = {}
 fingerTable = {
     'me': ("-1", ourIP, ourPort),
-    'intro': (hashedKey, ourIP, ourPort),
+    'intro': (hashedPos, ourIP, ourPort),
     'next': ("-1", ourIP, ourPort),
     'prev': ("-1", ourIP, ourPort),
     '1': ("-1", ourIP, ourPort),
