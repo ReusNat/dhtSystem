@@ -322,13 +322,18 @@ def run():
             running = False
 
 
+clientID = ''
 if len(argv) > 2:
     print('Too many arguments\nUsage:\npython3 bvDHT.py <IP>:<Port>\
             \nOR\npython3 bvDHT.py')
     exit(1)
-elif len(argv) == 2 and ':' not in argv[1]:
-    print('Usage:\npython3 bvDHT.py <IP>:<Port>\nOR\npython3 bvDHT.py')
-    exit(1)
+elif len(argv) == 2:
+    if ':' not in argv[1]:
+        print('Usage:\npython3 bvDHT.py <IP>:<Port>\nOR\npython3 bvDHT.py')
+        exit(1)
+    else:
+        clientID = argv[1]
+
 
 
 ourIP = getLocalIPAddress()
@@ -351,7 +356,6 @@ fingerTable = {
 # int(hasedKey, base=16) <- gets the int version of the digest
 # <clientIP>:<clientPort>
 
-clientID = argv[1]
 
 if clientID != '':
     clientIP, clientPort = clientID.split(':')
