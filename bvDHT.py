@@ -322,10 +322,13 @@ def run():
             running = False
 
 
-if len(argv) < 2:
-    exit('Not enough arguments\nUsage: python3 bvDHT.py <IP>:<Port>')
-elif len(argv) > 2:
-    exit('Too many arguments\nUsage: python3 bvDHT.py <IP>:<Port>')
+if len(argv) > 2:
+    print('Too many arguments\nUsage:\npython3 bvDHT.py <IP>:<Port>\
+            \nOR\npython3 bvDHT.py')
+    exit(1)
+elif len(argv) == 2 and ':' not in argv[1]:
+    print('Usage:\npython3 bvDHT.py <IP>:<Port>\nOR\npython3 bvDHT.py')
+    exit(1)
 
 
 ourIP = getLocalIPAddress()
