@@ -53,13 +53,18 @@ def closestAlgorithim(key):
         connTuple = (splitVal[0], int(splitVal[1]))
     return val
 
-# so this works basically by looking through all of our knownPeers list, which should include us.
+# so this works basically by looking through all of our knownPeers list, which
+# should include us.
 # for each peer in our known peers
-#  check if that peer's ID is less than the hashedKey and greater than the last closest id.
-#  if thats the case, change the last closest id to the current
-#  otherwise continue
-# now if at the end the closest peer is the first, we check if it's actually larger than the ID. If it is, than we know the previous person is actually the holder of that ID
-# thus, we loop back around to the last peer in our list and return that peer's USERID
+# check if that peer's ID is less than the hashedKey and greater than the last
+# closest id.
+# if thats the case, change the last closest id to the current
+# otherwise continue
+# now if at the end the closest peer is the first, we check if it's actually
+# larger than the ID. If it is, than we know the previous person is actually
+# the holder of that ID
+# thus, we loop back around to the last peer in our list and return that
+# peer's USERID
 
 
 def closestPeerSend(hashedPos, sock):
@@ -93,7 +98,12 @@ def joinSend(hashedPos, sock):
     nextIP, nextPort = getline(sock).split(':')
     nextPos = hashlib.sha224(f'{nextIP}:{nextPort}'.encode()).hexdigest()
     fingerTable['next'] = (nextPos, nextIP, int(nextPort))
-    numFiles = int(getline(sock).rstrip('\n'))
+    numFilesStr = getline(sock).rstrip()
+    
+    if numFilesStr == '':
+        numFiles = 0
+    else:
+        numFiles = int(numFilesStr)
 
     for i in range(0, int(numFiles)):
         fileHashPos = getline(sock)
@@ -117,7 +127,8 @@ def joinRecv(connInfo):
         if int(file, base=16) > int(hashedPos, base=16):
             filesToSend[file] = data[file]
 
-    sock.send((str(len(filesToSend)) + '\n').encode())
+    numFiles = (str(len(filesToSend)) + '\n')
+    sock.send(numFiles.encode())
     for file in filesToSend:
         sock.send((str(len(filesToSend[file])) + '\n').encode())
         sock.send(filesToSend[file])
