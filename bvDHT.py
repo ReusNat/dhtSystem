@@ -3,8 +3,6 @@ from sys import argv
 import threading
 import hashlib
 import binascii
-'''
-'''
 
 def getline(conn):
     msg = b''
@@ -25,7 +23,6 @@ def getLocalIPAddress():
 def updateFingerTable():
     offset = int((2**224)/6)
     currIndex = fingerTable['me'][0]
-    print(f'{offset=}\n{currIndex=}\n{type(currIndex)=}')
     for x in range(1, 6):
         intIndex = int(currIndex, base=16) + offset
         if intIndex > (2**224):
@@ -48,7 +45,6 @@ def closestAlgorithim(key=None, hashedKey=None):
         hashedKeyStr = hashlib.sha224(key.encode()).hexdigest()
     else:
         hashedKeyStr = hashedKey
-        print(type(hashedKey))
         hashedKey = int(hashedKey, base=16)
     listy = list(fingerTable.items())
     end = listy[0]
@@ -91,7 +87,6 @@ def closestAlgorithim(key=None, hashedKey=None):
 
 
 def closestPeerSend(hashedPos, sock):
-    print(type(sock))
     sock.send('CLOSEST_PEER'.encode())
     sock.send(hashedPos.encode())
     return getline(sock)
@@ -247,10 +242,9 @@ def containsRecv(connInfo):
             sock.send('FU'.encode())
 
 
-def getDataSend(hashPos, connInfo):
-    sock = connInfo[0]
+def getDataSend(hashPos, sock):
     sock.send('GET_DATA_NOW'.encode())
-    sock.send(hashPos)
+    sock.send(hashPos.encode())
     confirm = sock.recv(2)
     if confirm == 'FU':
         return None
@@ -258,7 +252,7 @@ def getDataSend(hashPos, connInfo):
     if confirm == 'FU':
         return None
 
-    numBytes = getline(connInfo)
+    numBytes = getline(sock)
     return sock.recv(int(numBytes.rstrip()))
 
 
@@ -296,7 +290,6 @@ def getDataRecv(connInfo):
 
 def insertSend(hashPos, sock, fileBytes):
     sock.send('INSERT_FILE!'.encode())
-    print(hashPos)
     sock.send(hashPos.encode())
     confirm = sock.recv(2).decode()
     if confirm == 'FU':
@@ -415,7 +408,7 @@ def run():
                 peerSock = socket(AF_INET, SOCK_STREAM)
                 peerSock.connect((closestIP, closestPort))
                 fileHash = hashlib.sha224(fileName.encode()).hexdigest()
-                print(getDataSend(fileHash, peerSock))
+                open(fileName, 'wb').write(getDataSend(fileHash, peerSock))
             elif command == 'leave':
                 pass
         except KeyboardInterrupt:
@@ -471,7 +464,12 @@ if clientID != '':
     joinSend(hashedPos, peerSock)
     fingerTable['me'] = (hashedPos, ourIP, ourPort)
     updateFingerTable()
-    print(fingerTable)
+
+updateFingerTable()
+if fingerTable["next"][0] == "-1":
+    fingerTable['next'] = (hashedPos, ourIP, ourPort)
+    fingerTable['prev'] = (hashedPos, ourIP, ourPort)
+
 
 # Listening Socket
 listener = socket(AF_INET, SOCK_STREAM)
