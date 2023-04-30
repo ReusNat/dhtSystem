@@ -2,7 +2,9 @@ from socket import *
 from sys import argv
 import threading
 import hashlib
-
+import binascii
+'''
+'''
 
 def getline(conn):
     msg = b''
@@ -21,14 +23,33 @@ def getLocalIPAddress():
 
 
 def updateFingerTable():
-    pass
+    offset = int((2**224)/6)
+    currIndex = fingerTable['me'][0]
+    print(f'{offset=}\n{currIndex=}\n{type(currIndex)=}')
+    for x in range(1, 6):
+        intIndex = int(currIndex, base=16) + offset
+        if intIndex > (2**224):
+            currIndex = hex(intIndex-2**224)[2:]
+            currIndex = "0"*(56-len(currIndex)) + currIndex
+        else:
+            currIndex = hex(intIndex)[2:]
+            currIndex = "0"*(56-len(currIndex)) + currIndex
+        conn = closestAlgorithim(hashedKey=currIndex)
+        ip, port = conn.split(':')
+        fingerTable[str(x)] = (currIndex, ip, port)
 
 
 #inputs the non-encrypted Key.
 #returns closest peer's userID without a new line... str(ip) + ":" + str(port)
-def closestAlgorithim(key):
-    hashedKey = int(hashlib.sha224(key.encode()).hexdigest(),base = 16)
-    hashedKeyStr = hashlib.sha224(key.encode()).hexdigest()
+def closestAlgorithim(key=None, hashedKey=None):
+    hashedKeyStr = ''
+    if hashedKey is None:
+        hashedKey = int(hashlib.sha224(key.encode()).hexdigest(),base = 16)
+        hashedKeyStr = hashlib.sha224(key.encode()).hexdigest()
+    else:
+        hashedKeyStr = hashedKey
+        print(type(hashedKey))
+        hashedKey = int(hashedKey, base=16)
     listy = list(fingerTable.items())
     end = listy[0]
     for peer in listy:
@@ -44,6 +65,8 @@ def closestAlgorithim(key):
     connTuple = (end[1][1], int(end[1][2]))
     val = str(end[1][1]) + ":" + str(end[1][2])
     while True:
+        if connTuple[0] == fingerTable['me'][1]:
+            return val
         clientSock = socket(AF_INET, SOCK_STREAM)
         clientSock.connect(connTuple)
         val = closestPeerSend(hashedKeyStr, clientSock)
@@ -68,6 +91,7 @@ def closestAlgorithim(key):
 
 
 def closestPeerSend(hashedPos, sock):
+    print(type(sock))
     sock.send('CLOSEST_PEER'.encode())
     sock.send(hashedPos.encode())
     return getline(sock)
@@ -119,7 +143,7 @@ def joinRecv(connInfo):
     sock = connInfo[0]
     clientUID = getline(sock)
     hashedPos = hashlib.sha224(clientUID.encode()).hexdigest()
-    sock.send((closestAlgorithim(clientUID) + '\n').encode())
+    sock.send((closestAlgorithim(key=clientUID) + '\n').encode())
     clientIp, clientPort = clientUID.split(':')
 
     filesToSend = {}
@@ -173,7 +197,12 @@ def updatePeerSend(peerInfo):
 
 
 def updatePeerRecv(connInfo):
-    pass
+    sock = connInfo[0]
+    prevID = getline(sock).rstrip()
+    prevIP, prevPort = prevID.split(':')
+    prevHash = hashlib.sha224(prevID.encode()).hexdigest()
+    fingerTable['prev'] = (prevHash, prevIP, int(prevPort))
+    sock.send('OK'.encode())
 
 
 def containsSend(hashPos, connInfo):
@@ -191,7 +220,31 @@ def containsSend(hashPos, connInfo):
 
 
 def containsRecv(connInfo):
-    pass
+    sock = connInfo[0]
+    hashval = sock.recv(56).decode()
+    ourPos = fingerTable['me'][0]
+    nextPos = fingerTable['next'][0]
+    ourPos = int(ourPos, base=16)
+    nextPos = int(nextPos, base=16)
+    hashint = int(hashval, base=16)
+    if ourPos < nextPos:
+        if ourPos < hashint < nextPos:
+            sock.send("OK".encode())
+            if hashval in data:
+                sock.send("OK".encode())
+            else:
+                sock.send('FU'.encode())
+        else:
+            sock.send('FU'.encode())
+    else:
+        if hashint < nextPos and hashint > ourPos:
+            sock.send("OK".encode())
+            if hashval in data:
+                sock.send("OK".encode())
+            else:
+                sock.send('FU'.encode())
+        else:
+            sock.send('FU'.encode())
 
 
 def getDataSend(hashPos, connInfo):
@@ -210,16 +263,45 @@ def getDataSend(hashPos, connInfo):
 
 
 def getDataRecv(connInfo):
-    pass
+    sock = connInfo[0]
+    hashval = sock.recv(56).decode()
+    ourPos = fingerTable['me'][0]
+    nextPos = fingerTable['next'][0]
+    ourPos = int(ourPos, base=16)
+    nextPos = int(nextPos, base=16)
+    hashint = int(hashval, base=16)
+    if ourPos < nextPos:
+        if ourPos < hashint < nextPos:
+            sock.send("OK".encode())
+            if hashval in data:
+                sock.send("OK".encode())
+                sock.send((str(len(data[hashval]))+'\n').encode())
+                sock.send(data[hashval])
+            else:
+                sock.send('FU'.encode())
+        else:
+            sock.send('FU'.encode())
+    else:
+        if hashint < nextPos and hashint > ourPos:
+            sock.send("OK".encode())
+            if hashval in data:
+                sock.send("OK".encode())
+                sock.send((str(len(data[hashval]))+'\n').encode())
+                sock.send(data[hashval])
+            else:
+                sock.send('FU'.encode())
+        else:
+            sock.send('FU'.encode())
 
 
 def insertSend(hashPos, sock, fileBytes):
     sock.send('INSERT_FILE!'.encode())
-    sock.send(hashPos)
+    print(hashPos)
+    sock.send(hashPos.encode())
     confirm = sock.recv(2).decode()
     if confirm == 'FU':
         return False
-
+    
     sock.send((str(len(fileBytes)) + '\n').encode())
     sock.send(fileBytes)
 
@@ -231,8 +313,8 @@ def insertSend(hashPos, sock, fileBytes):
 
 def insertRecv(connInfo):
     sock = connInfo[0]
-    hashPos = int(sock.recv(56).decode(), base=16)
-    if closestPeerSend(connInfo, hashPos) == fingerTable['me']:
+    hashPos = sock.recv(56).decode()
+    if closestAlgorithim(hashedKey=hashPos) == ourID:
         sock.send('OK'.encode())
         fileSize = int(getline(sock))
         try:
@@ -304,12 +386,13 @@ def run():
                 fileName = input('File name: ')
                 fileHashPos = hashlib.sha224(
                         fileName.encode()).hexdigest()
-                closestIP, closestPort = closestPeerSend(fileHashPos).split(':')
+                closestIP, closestPort = closestAlgorithim(hashedKey=fileHashPos).split(':')
                 closestPort = int(closestPort)
                 peerSock = socket(AF_INET, SOCK_STREAM)
                 peerSock.connect((closestIP, closestPort))
                 try:
                     fileBytes = open(fileName, 'rb').read()
+                    print(fileBytes[:10])
                     if insertSend(fileHashPos, peerSock, fileBytes):
                         print(f'{fileName} inserted.')
                     else:
@@ -320,13 +403,19 @@ def run():
                 fileName = input('File name: ')
                 fileHashPos = hashlib.sha224(
                         fileName.encode()).hexdigest()
-                closestIP, closestPort = closestPeerSend(fileHashPos).split(':')
+                closestIP, closestPort = closestAlgorithim(hashedKey=fileHashPos).split(':')
                 closestPort = int(closestPort)
                 peerSock = socket(AF_INET, SOCK_STREAM)
                 peerSock.connect((closestIP, closestPort))
                 deleteSend(fileHashPos, peerSock)
             elif command == 'get':
-                pass
+                fileName = input('Filename: ')
+                closestIP, closestPort = closestAlgorithim(hashedKey=fileHashPos).split(':')
+                closestPort = int(closestPort)
+                peerSock = socket(AF_INET, SOCK_STREAM)
+                peerSock.connect((closestIP, closestPort))
+                fileHash = hashlib.sha224(fileName.encode()).hexdigest()
+                print(getDataSend(fileHash, peerSock))
             elif command == 'leave':
                 pass
         except KeyboardInterrupt:
@@ -372,8 +461,7 @@ if clientID != '':
     clientIP, clientPort = clientID.split(':')
     clientHash = hashlib.sha224(clientID.encode()).hexdigest()
     fingerTable['intro'] = (clientHash, clientIP, clientPort)
-    closestIP, closestPort = closestAlgorithim(hashedPos).split(':')
-    print(closestIP,closestPort)
+    closestIP, closestPort = closestAlgorithim(hashedKey=hashedPos).split(':')
     closestPort = int(closestPort)
     closestHash = hashlib.sha224(
             f'{closestIP}:{closestPort}'.encode()).hexdigest()
@@ -381,6 +469,9 @@ if clientID != '':
     peerSock = socket(AF_INET, SOCK_STREAM)
     peerSock.connect((closestIP, closestPort))
     joinSend(hashedPos, peerSock)
+    fingerTable['me'] = (hashedPos, ourIP, ourPort)
+    updateFingerTable()
+    print(fingerTable)
 
 # Listening Socket
 listener = socket(AF_INET, SOCK_STREAM)
